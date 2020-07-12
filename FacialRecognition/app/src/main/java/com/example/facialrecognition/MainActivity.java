@@ -18,6 +18,7 @@ import android.provider.MediaStore;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -37,10 +38,11 @@ public class MainActivity extends AppCompatActivity {
     private static final int CAMERA_REQUEST_CODE = 1;
     ImageView imageView;
     Button captureButton;
-    Bitmap bitmap;
+    Button uploadButton;
+    EditText nameField;
+    Uri imageUri;
 
     private StorageReference mStorage;
-    private ProgressDialog mProgress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,9 +51,10 @@ public class MainActivity extends AppCompatActivity {
 
         imageView = findViewById(R.id.imageView);
         captureButton = findViewById(R.id.captureButton);
+        uploadButton = findViewById(R.id.uploadButton);
+        nameField = findViewById(R.id.editTextName);
 
         mStorage = FirebaseStorage.getInstance().getReference();
-        mProgress = new ProgressDialog(this);
 
         captureButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -60,6 +63,32 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        uploadButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                uploadToStorage();
+            }
+        });
+
+    }
+
+    private void uploadToStorage() {
+
+        if (imageUri == null){
+            Toast.makeText(MainActivity.this, "Take a photo of yourself first", Toast.LENGTH_LONG).show();
+        }
+        else if(nameField.getText().toString().equals("")){
+            Toast.makeText(MainActivity.this, "Please enter your name", Toast.LENGTH_LONG).show();
+        }
+        else {
+            StorageReference filepath = mStorage.child("Photos").child(nameField.getText().toString());
+            filepath.putFile(imageUri).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+                @Override
+                public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                    Toast.makeText(MainActivity.this, "Uploading Finished", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
 
     }
 
@@ -74,24 +103,12 @@ public class MainActivity extends AppCompatActivity {
 
         if (requestCode == CAMERA_REQUEST_CODE && resultCode == RESULT_OK){
 
-            //mProgress.setMessage("Uploading Image ...");
-            //mProgress.show();
-
-            bitmap = (Bitmap)data.getExtras().get("data");
+            Bitmap bitmap = (Bitmap)data.getExtras().get("data");
             imageView.setImageBitmap(bitmap);
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
             String path = MediaStore.Images.Media.insertImage(getApplicationContext().getContentResolver(), bitmap, "Title", null);
-            Uri uri = Uri.parse(path);
-
-            StorageReference filepath = mStorage.child("Photos").child(uri.getLastPathSegment());
-            filepath.putFile(uri).addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
-                @Override
-                public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
-                    //mProgress.dismiss();
-                    Toast.makeText(MainActivity.this, "Uploading Finished ...", Toast.LENGTH_SHORT).show();
-                }
-            });
+            imageUri = Uri.parse(path);
 
         }
     }
@@ -100,6 +117,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+            //TODO: Ask storage permission at runtime
         }
         else{
             openCamera();
